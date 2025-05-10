@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { suggestPickupTime, type SuggestPickupTimeInput, type SuggestPickupTimeOutput } from '@/ai/flows/suggest-pickup-time';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { DonationSize } from '@/types';
