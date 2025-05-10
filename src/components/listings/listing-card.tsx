@@ -1,8 +1,12 @@
+'use client';
 import Image from 'next/image';
 import type { Listing } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { MapPin, Clock, Package, Utensils } from 'lucide-react';
+import ClaimForm from '@/components/claims/claim-form';
+import { useState } from 'react';
 
 interface ListingCardProps {
   listing: Listing;
@@ -51,6 +55,13 @@ const SoupIcon = (props: React.SVGProps<SVGSVGElement>) => ( // Lucide 'Soup'
 
 
 export default function ListingCard({ listing }: ListingCardProps) {
+  const [isClaimDialogOpen, setIsClaimDialogOpen] = useState(false);
+
+  const handleClaimSuccess = () => {
+    setIsClaimDialogOpen(false);
+    // Toast for success is handled within ClaimForm
+  };
+
   return (
     <Card className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
       {listing.imageUrl && (
@@ -87,7 +98,25 @@ export default function ListingCard({ listing }: ListingCardProps) {
         </div>
       </CardContent>
       <CardFooter>
-        <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">View Details & Claim</Button>
+        <Dialog open={isClaimDialogOpen} onOpenChange={setIsClaimDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">View Details &amp; Claim</Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-2xl text-primary">Claim Food from {listing.restaurantName}</DialogTitle>
+              <DialogDescription>
+                You are about to claim: <span className="font-semibold">{listing.foodType} ({listing.quantity})</span>.
+                Please fill out your details below to proceed with the claim.
+              </DialogDescription>
+            </DialogHeader>
+            <ClaimForm
+              listingId={listing.id}
+              listingRestaurantName={listing.restaurantName}
+              onClaimSubmitted={handleClaimSuccess}
+            />
+          </DialogContent>
+        </Dialog>
       </CardFooter>
     </Card>
   );

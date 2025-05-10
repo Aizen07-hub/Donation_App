@@ -12,3 +12,15 @@ export interface Listing {
 
 // For AI integration
 export type DonationSize = "small" | "medium" | "large";
+
+// For Claim Form
+export type ClaimantType = 'individual' | 'organisation';
+
+export interface ClaimFormData {
+  listingId: string;
+  listingRestaurantName: string; // To display in the claim form/confirmation
+  name: string;
+  location: string;
+  phoneNumber: string;
+  claimantType: ClaimantType;
+}
