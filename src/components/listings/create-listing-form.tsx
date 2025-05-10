@@ -1,3 +1,4 @@
+// src/components/listings/create-listing-form.tsx
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,23 +24,34 @@ import { Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { DonationSize } from '@/types';
 
-const वर्तमान = new Date();
-const वर्तमानHour = वर्तमान.getHours().toString().padStart(2, '0');
-const वर्तमानMinute = वर्तमान.getMinutes().toString().padStart(2, '0');
-const currentTimeString = `${वर्तमानHour}:${वर्तमानMinute}`;
-
+const foodTypeOptions = [
+  "Bakery (Bread, Pastries, Cakes)",
+  "Italian (Pizza, Pasta)",
+  "Asian (Sushi, Noodles, Rice dishes)",
+  "Sandwiches & Salads",
+  "Mexican (Tacos, Burritos)",
+  "Indian (Curries, Biryani)",
+  "Fast Food (Burgers, Fries)",
+  "Beverages",
+  "Groceries (Canned goods, Produce)",
+  "Desserts",
+  "Other",
+] as const;
 
 const formSchema = z.object({
   restaurantName: z.string().min(2, { message: 'Restaurant name must be at least 2 characters.' }),
-  foodType: z.string().min(3, { message: 'Food type must be at least 3 characters.' }),
+  foodType: z.enum(foodTypeOptions, { required_error: "Please select a food type." }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
   quantity: z.string().min(1, { message: 'Quantity is required.' }),
   donationSize: z.enum(['small', 'medium', 'large'], { required_error: "Please select donation size."}),
-  closingTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'Invalid time format (HH:MM).' }).default(currentTimeString),
+  closingTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'Invalid time format (HH:MM).' }),
   pickupWindowStart: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'Invalid time format (HH:MM).' }),
   pickupWindowEnd: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'Invalid time format (HH:MM).' }),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
-}).refine(data => data.pickupWindowStart < data.pickupWindowEnd, {
+}).refine(data => {
+    if (!data.pickupWindowStart || !data.pickupWindowEnd) return true; // Skip validation if fields are empty
+    return data.pickupWindowStart < data.pickupWindowEnd;
+  }, {
   message: "Pickup start time must be before end time.",
   path: ["pickupWindowEnd"],
 });
@@ -50,29 +62,44 @@ export default function CreateListingForm() {
   const [isSuggestingTime, setIsSuggestingTime] = useState(false);
   const [suggestedTimeInfo, setSuggestedTimeInfo] = useState<SuggestPickupTimeOutput | null>(null);
   const { toast } = useToast();
+  const [currentTime, setCurrentTime] = useState('');
+
+  useEffect(() => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    setCurrentTime(`${hours}:${minutes}`);
+  }, []);
+
 
   const form = useForm<CreateListingFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       restaurantName: '',
-      foodType: '',
+      foodType: undefined,
       description: '',
       quantity: '',
       donationSize: undefined,
-      closingTime: '22:00', // Default closing time
+      closingTime: '22:00', 
       pickupWindowStart: '',
       pickupWindowEnd: '',
       address: '',
     },
   });
 
+  useEffect(() => {
+    if (currentTime) {
+        form.resetField('closingTime', { defaultValue: '22:00' }); // Ensure default is set after currentTime is available
+    }
+  }, [currentTime, form]);
+
+
   async function onSubmit(values: CreateListingFormData) {
-    // TODO: Implement actual submission logic (e.g., API call)
     console.log('Form submitted:', values);
     toast({
       title: 'Listing Created!',
       description: `${values.foodType} from ${values.restaurantName} has been listed.`,
-      variant: 'default', // ShadCN default is not 'success', use 'default'
+      variant: 'default',
     });
     form.reset();
     setSuggestedTimeInfo(null);
@@ -94,7 +121,7 @@ export default function CreateListingForm() {
     try {
       const input: SuggestPickupTimeInput = {
         closingTime,
-        donationSize: donationSize as DonationSize, // cast as it's validated by Zod enum
+        donationSize: donationSize as DonationSize, 
         foodType,
       };
       const result = await suggestPickupTime(input);
@@ -103,8 +130,6 @@ export default function CreateListingForm() {
         title: 'Pickup Time Suggested!',
         description: `AI suggests picking up around ${result.suggestedPickupTime}.`,
       });
-      // Optionally, populate form fields if user accepts
-      // form.setValue('pickupWindowStart', result.suggestedPickupTime);
     } catch (error) {
       console.error('Error suggesting pickup time:', error);
       toast({
@@ -146,9 +171,20 @@ export default function CreateListingForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Food Type / Category</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Bakery, Italian, Sandwiches" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select food type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {foodTypeOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -200,8 +236,8 @@ export default function CreateListingForm() {
               )}
             />
 
-            <Card className="bg-secondary/30 p-6">
-              <CardTitle className="text-xl mb-2 text-primary/90">Scheduling</CardTitle>
+            <Card className="bg-secondary/30 p-6 rounded-lg">
+              <CardTitle className="text-xl mb-4 text-primary/90">Scheduling Details</CardTitle>
               <div className="grid md:grid-cols-3 gap-6 items-end">
                  <FormField
                   control={form.control}
@@ -256,20 +292,20 @@ export default function CreateListingForm() {
 
               {suggestedTimeInfo && (
                 <div className="mt-4 p-4 bg-accent/10 border border-accent/30 rounded-md">
-                  <p className="font-semibold text-accent-foreground/80">
+                  <p className="font-semibold text-accent-foreground/80 flex items-center">
                     <Lightbulb className="inline mr-2 h-4 w-4 text-accent" />
-                    AI Suggestion: Pickup around <span className="text-accent font-bold">{suggestedTimeInfo.suggestedPickupTime}</span>.
+                    AI Suggestion: Pickup around <span className="text-accent font-bold ml-1">{suggestedTimeInfo.suggestedPickupTime}</span>.
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">Reasoning: {suggestedTimeInfo.reasoning}</p>
                   <Button
                     type="button"
                     size="sm"
                     variant="link"
-                    className="text-accent p-0 h-auto mt-1"
+                    className="text-accent p-0 h-auto mt-1 hover:underline"
                     onClick={() => {
                       const suggested = suggestedTimeInfo.suggestedPickupTime;
-                      // Set a 30 min window around suggested time, or prompt user
                       const [hours, minutes] = suggested.split(':').map(Number);
+                      
                       const startDate = new Date();
                       startDate.setHours(hours, minutes, 0, 0);
                       
@@ -277,8 +313,8 @@ export default function CreateListingForm() {
 
                       const formatTime = (date: Date) => `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
                       
-                      form.setValue('pickupWindowStart', formatTime(startDate));
-                      form.setValue('pickupWindowEnd', formatTime(endDate));
+                      form.setValue('pickupWindowStart', formatTime(startDate), { shouldValidate: true });
+                      form.setValue('pickupWindowEnd', formatTime(endDate), { shouldValidate: true });
                        toast({ title: "Time Applied!", description: `Pickup window set to ${formatTime(startDate)} - ${formatTime(endDate)}.`})
                     }}
                   >
@@ -315,8 +351,8 @@ export default function CreateListingForm() {
                   )}
                 />
               </div>
-               <FormDescription className="mt-2">
-                Set your preferred pickup window or use the AI suggestion.
+               <FormDescription className="mt-2 text-sm">
+                Set your preferred pickup window or use the AI suggestion. The suggested time can help you set a 30-minute window.
               </FormDescription>
             </Card>
 
@@ -330,3 +366,5 @@ export default function CreateListingForm() {
     </Card>
   );
 }
+
+    
