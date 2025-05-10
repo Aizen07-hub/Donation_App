@@ -1,3 +1,4 @@
+
 // src/components/listings/create-listing-form.tsx
 'use client';
 
@@ -23,6 +24,7 @@ import { useState, useEffect } from 'react';
 import { Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { DonationSize } from '@/types';
+import { addListing, type CreateListingFormData as StoreCreateListingFormData } from '@/lib/listings-store'; // Updated import
 
 const foodTypeOptions = [
   "Bakery (Bread, Pastries, Cakes)",
@@ -89,16 +91,19 @@ export default function CreateListingForm() {
 
   useEffect(() => {
     if (currentTime) {
-        form.resetField('closingTime', { defaultValue: '22:00' }); // Ensure default is set after currentTime is available
+        form.resetField('closingTime', { defaultValue: '22:00' }); 
     }
   }, [currentTime, form]);
 
 
   async function onSubmit(values: CreateListingFormData) {
-    console.log('Form submitted:', values);
+    // Map form values to the type expected by addListing if necessary,
+    // but CreateListingFormData from Zod matches StoreCreateListingFormData structure for relevant fields.
+    const newListing = addListing(values as StoreCreateListingFormData); 
+    console.log('Form submitted, new listing added:', newListing);
     toast({
       title: 'Listing Created!',
-      description: `${values.foodType} from ${values.restaurantName} has been listed.`,
+      description: `${newListing.foodType} from ${newListing.restaurantName} has been successfully listed.`,
       variant: 'default',
     });
     form.reset();
@@ -366,5 +371,3 @@ export default function CreateListingForm() {
     </Card>
   );
 }
-
-    

@@ -10,84 +10,39 @@ import { Button } from '@/components/ui/button';
 import { Search, Filter } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
+import { getListings, subscribe } from '@/lib/listings-store';
 
-const mockListings: Listing[] = [
-  {
-    id: '1',
-    restaurantName: 'Green Leaf Cafe',
-    foodType: 'Salads and Sandwiches',
-    description: 'Freshly made salads and assorted sandwiches from today.',
-    quantity: 'Approx. 10-12 meals',
-    pickupTime: '18:00 - 19:00',
-    address: '123 Main St, Anytown',
-    imageUrl: 'https://picsum.photos/400/300?random=1',
-    distance: '0.5 miles',
-  },
-  {
-    id: '2',
-    restaurantName: 'The Daily Bread Bakery',
-    foodType: 'Assorted Breads and Pastries',
-    description: 'Sourdough, croissants, muffins. Baked fresh this morning.',
-    quantity: '2 large boxes',
-    pickupTime: '16:30 - 17:30',
-    address: '456 Oak Ave, Anytown',
-    imageUrl: 'https://picsum.photos/400/300?random=2',
-    distance: '1.2 miles',
-  },
-  {
-    id: '3',
-    restaurantName: 'Pizza Palace',
-    foodType: 'Pepperoni and Veggie Pizzas',
-    description: 'Unsold pizzas from the lunch rush, still warm!',
-    quantity: '5 large pizzas',
-    pickupTime: '19:00 - 20:00 Suggested by AI',
-    address: '789 Pine Rd, Anytown',
-    imageUrl: 'https://picsum.photos/400/300?random=3',
-    distance: '2.5 miles',
-  },
-   {
-    id: '4',
-    restaurantName: 'Mama Mia Pasta',
-    foodType: 'Pasta Dishes',
-    description: 'Generous portions of lasagna and spaghetti bolognese.',
-    quantity: 'Approx. 8-10 portions',
-    pickupTime: '20:00 - 20:30',
-    address: '101 Pasta Ln, Anytown',
-    imageUrl: 'https://picsum.photos/400/300?random=4',
-    distance: '0.8 miles',
-  },
-  {
-    id: '5',
-    restaurantName: 'Sushi Central',
-    foodType: 'Sushi Rolls and Nigiri',
-    description: 'Variety of sushi rolls and nigiri, made today.',
-    quantity: 'About 30-40 pieces',
-    pickupTime: '21:00 - 21:30',
-    address: '222 Fish St, Anytown',
-    imageUrl: 'https://picsum.photos/400/300?random=5',
-    distance: '3.1 miles',
-  },
-];
 
 export default function BrowseListingsPage() {
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [allListings, setAllListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [foodTypeFilter, setFoodTypeFilter] = useState('all');
   
   useEffect(() => {
-    // Simulate API call (now instant with mock data)
-    setListings(mockListings);
+    setAllListings(getListings());
     setIsLoading(false);
+
+    const unsubscribe = subscribe(() => {
+      setAllListings(getListings());
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const filteredListings = listings.filter(listing =>
+  const filteredListings = allListings.filter(listing =>
     (listing.restaurantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     listing.foodType.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (foodTypeFilter === 'all' || listing.foodType.toLowerCase().includes(foodTypeFilter.toLowerCase()))
+     listing.foodType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     listing.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (foodTypeFilter === 'all' || listing.foodType.toLowerCase().includes(foodTypeFilter.toLowerCase()) || 
+     (foodTypeFilter !== 'all' && listing.foodType.toLowerCase().startsWith(foodTypeFilter.toLowerCase())))
   );
 
-  const foodTypes = ['all', ...new Set(mockListings.map(l => l.foodType.split(' ')[0]))]; // simplified food types
+  const foodTypes = ['all', ...new Set(allListings.map(l => {
+    const firstWord = l.foodType.split(' ')[0].replace(/[(),]/g, '').trim();
+    return firstWord || l.foodType; // Fallback to full foodType if first word is empty
+  }).filter(Boolean))];
+
 
   return (
     <div className="space-y-8">
@@ -98,12 +53,12 @@ export default function BrowseListingsPage() {
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div className="md:col-span-2">
-            <label htmlFor="search" className="block text-sm font-medium text-foreground/80 mb-1">Search by Name or Food Type</label>
+            <label htmlFor="search" className="block text-sm font-medium text-foreground/80 mb-1">Search by Name, Food Type, or Description</label>
             <div className="relative">
               <Input
                 id="search"
                 type="text"
-                placeholder="e.g., Pizza Palace or Sandwiches"
+                placeholder="e.g., Pizza Palace, Sandwiches, or Freshly Baked"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -160,7 +115,7 @@ export default function BrowseListingsPage() {
         <div className="text-center py-12">
           <Search className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <p className="text-xl text-muted-foreground">No listings found matching your criteria.</p>
-          <p className="text-sm text-muted-foreground">Try adjusting your search or filters.</p>
+          <p className="text-sm text-muted-foreground">Try adjusting your search or filters, or check back later for new donations!</p>
         </div>
       )}
     </div>
