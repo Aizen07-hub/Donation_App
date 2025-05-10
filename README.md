@@ -1,5 +1,5 @@
 SDG-2-ZERO HUNGER
-
+Team skibidi
 
 SurplusFoodShare: Empowering Hotels to Donate Excess Food
 SurplusFoodShare is a web application that facilitates the donation of surplus food from hotels to charitable organizations, ensuring that excess food reaches those in need while reducing food waste.
