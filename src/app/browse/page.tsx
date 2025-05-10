@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -75,12 +76,9 @@ export default function BrowseListingsPage() {
   const [foodTypeFilter, setFoodTypeFilter] = useState('all');
   
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setListings(mockListings);
-      setIsLoading(false);
-    }, 1500); // Simulate 1.5 second loading
-    return () => clearTimeout(timer);
+    // Simulate API call (now instant with mock data)
+    setListings(mockListings);
+    setIsLoading(false);
   }, []);
 
   const filteredListings = listings.filter(listing =>
