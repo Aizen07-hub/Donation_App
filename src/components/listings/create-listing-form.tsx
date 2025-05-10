@@ -20,11 +20,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { suggestPickupTime, type SuggestPickupTimeInput, type SuggestPickupTimeOutput } from '@/ai/flows/suggest-pickup-time';
+import { suggestFoodDescription, type SuggestFoodDescriptionInput, type SuggestFoodDescriptionOutput } from '@/ai/flows/suggest-food-description';
 import { useState, useEffect } from 'react';
 import { Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { DonationSize } from '@/types';
-import { addListing, type CreateListingFormData as StoreCreateListingFormData } from '@/lib/listings-store'; // Updated import
+import { addListing, type CreateListingFormData as StoreCreateListingFormData } from '@/lib/listings-store'; 
 
 const foodTypeOptions = [
   "Bakery (Bread, Pastries, Cakes)",
@@ -43,7 +44,7 @@ const foodTypeOptions = [
 const formSchema = z.object({
   restaurantName: z.string().min(2, { message: 'Restaurant name must be at least 2 characters.' }),
   foodType: z.enum(foodTypeOptions, { required_error: "Please select a food type." }),
-  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
+  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }).max(300, { message: 'Description must be at most 300 characters.'}),
   quantity: z.string().min(1, { message: 'Quantity is required.' }),
   donationSize: z.enum(['small', 'medium', 'large'], { required_error: "Please select donation size."}),
   closingTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'Invalid time format (HH:MM).' }),
@@ -51,7 +52,7 @@ const formSchema = z.object({
   pickupWindowEnd: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'Invalid time format (HH:MM).' }),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
 }).refine(data => {
-    if (!data.pickupWindowStart || !data.pickupWindowEnd) return true; // Skip validation if fields are empty
+    if (!data.pickupWindowStart || !data.pickupWindowEnd) return true; 
     return data.pickupWindowStart < data.pickupWindowEnd;
   }, {
   message: "Pickup start time must be before end time.",
@@ -63,6 +64,8 @@ type CreateListingFormData = z.infer<typeof formSchema>;
 export default function CreateListingForm() {
   const [isSuggestingTime, setIsSuggestingTime] = useState(false);
   const [suggestedTimeInfo, setSuggestedTimeInfo] = useState<SuggestPickupTimeOutput | null>(null);
+  const [isSuggestingDescription, setIsSuggestingDescription] = useState(false);
+  const [suggestedDescriptionInfo, setSuggestedDescriptionInfo] = useState<SuggestFoodDescriptionOutput | null>(null);
   const { toast } = useToast();
   const [currentTime, setCurrentTime] = useState('');
 
@@ -97,8 +100,6 @@ export default function CreateListingForm() {
 
 
   async function onSubmit(values: CreateListingFormData) {
-    // Map form values to the type expected by addListing if necessary,
-    // but CreateListingFormData from Zod matches StoreCreateListingFormData structure for relevant fields.
     const newListing = addListing(values as StoreCreateListingFormData); 
     console.log('Form submitted, new listing added:', newListing);
     toast({
@@ -108,6 +109,7 @@ export default function CreateListingForm() {
     });
     form.reset();
     setSuggestedTimeInfo(null);
+    setSuggestedDescriptionInfo(null);
   }
 
   async function handleSuggestPickupTime() {
@@ -115,7 +117,7 @@ export default function CreateListingForm() {
     if (!closingTime || !donationSize || !foodType) {
       toast({
         title: 'Missing Information',
-        description: 'Please fill in Closing Time, Donation Size, and Food Type to get a suggestion.',
+        description: 'Please fill in Closing Time, Donation Size, and Food Type to get a time suggestion.',
         variant: 'destructive',
       });
       return;
@@ -146,6 +148,40 @@ export default function CreateListingForm() {
       setIsSuggestingTime(false);
     }
   }
+
+  async function handleSuggestDescription() {
+    const { foodType, quantity } = form.getValues();
+    if (!foodType || !quantity) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please fill in Food Type and Quantity to get a description suggestion.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSuggestingDescription(true);
+    setSuggestedDescriptionInfo(null);
+    try {
+      const input: SuggestFoodDescriptionInput = { foodType, quantity };
+      const result = await suggestFoodDescription(input);
+      setSuggestedDescriptionInfo(result);
+      toast({
+        title: 'Description Suggested!',
+        description: 'AI has generated a description for your listing.',
+      });
+    } catch (error) {
+      console.error('Error suggesting description:', error);
+      toast({
+        title: 'Error Suggesting Description',
+        description: 'Could not get an AI suggestion. Please try again or write manually.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSuggestingDescription(false);
+    }
+  }
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
@@ -208,24 +244,64 @@ export default function CreateListingForm() {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Briefly describe the food items, ingredients, or any special notes (e.g., vegetarian, contains nuts)."
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            
+            <div className="space-y-2">
+               <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex justify-between items-center">
+                      <FormLabel>Description</FormLabel>
+                      <Button
+                        type="button"
+                        onClick={handleSuggestDescription}
+                        disabled={isSuggestingDescription || !form.watch('foodType') || !form.watch('quantity')}
+                        variant="outline"
+                        size="sm"
+                        className="border-accent text-accent hover:bg-accent/10 text-xs"
+                      >
+                        {isSuggestingDescription ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Lightbulb className="mr-1 h-3 w-3" />
+                        )}
+                        Suggest Description
+                      </Button>
+                    </div>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Briefly describe the food items, ingredients, or any special notes (e.g., vegetarian, contains nuts)."
+                        className="resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {suggestedDescriptionInfo && (
+                <div className="mt-2 p-3 bg-accent/10 border border-accent/30 rounded-md">
+                  <p className="font-semibold text-accent-foreground/80 flex items-start text-sm">
+                    <Lightbulb className="inline mr-2 h-4 w-4 text-accent shrink-0 mt-0.5" />
+                    <span>AI Suggestion: <span className="italic">"{suggestedDescriptionInfo.suggestedDescription}"</span></span>
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="link"
+                    className="text-accent p-0 h-auto mt-1 text-xs hover:underline"
+                    onClick={() => {
+                      form.setValue('description', suggestedDescriptionInfo.suggestedDescription, { shouldValidate: true });
+                      toast({ title: "Description Applied!", description: `AI suggested description has been filled in.`})
+                    }}
+                  >
+                    Use this description
+                  </Button>
+                </div>
               )}
-            />
+            </div>
+
 
             <FormField
               control={form.control}
@@ -282,7 +358,7 @@ export default function CreateListingForm() {
                 <Button
                   type="button"
                   onClick={handleSuggestPickupTime}
-                  disabled={isSuggestingTime}
+                  disabled={isSuggestingTime || !form.watch('closingTime') || !form.watch('donationSize') || !form.watch('foodType')}
                   variant="outline"
                   className="w-full border-accent text-accent hover:bg-accent/10"
                 >
